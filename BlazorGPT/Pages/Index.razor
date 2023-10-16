@@ -1,0 +1,360 @@
+﻿@page "/"
+@using Azure.AI.OpenAI
+@using Azure.Identity
+@using System.Text.RegularExpressions
+@using BlazorGPT.Data
+@using BlazorGPT.Models
+@inject IWebHostEnvironment Environment
+@inject ILogger<Index> Logger
+
+
+<PageTitle>ChatGPT API</PageTitle>
+
+<h1>ChatGPT API</h1>
+
+Let's explore the ChatGPT API.
+
+<br />
+<br />
+
+<div class="form-group-sm">
+    <label class="control-label" style="font-weight:bold">Prompt:</label>
+    <textarea rows="6" @bind="@Model!.Prompt1" class="form-control" style="background-color: #F5FFF5"></textarea>
+</div>
+<div class="row mt-2">
+    <div class="col col-md-3">
+        <button class="btn btn-primary" @onclick="GenerateChatbotResponse">Ask ChatGPT</button>
+    </div>
+    <div class="col col-md-3">
+        <button class="btn btn-primary" @onclick="async () => await GenerateImage()">Generate Image</button>
+    </div>
+    <div class="col col-md-2">
+        <button class="btn btn-primary" @onclick="SummarizeText">Summarize Text</button>
+    </div>
+</div>
+<div class="row mt-2">
+    <div class="col col-md-3">
+        <select @onchange="OnSamplePromptSelected">
+            @foreach (var pm in promptModels.OrderBy(x => x.Name).ToList())
+            {
+                <option value=@pm.Name>@pm.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col col-md-3">
+        <select @onchange="OnSampleImagePromptSelected">
+            @foreach (var pm in imagePromptModels.OrderBy(x => x.Name).ToList())
+            {
+                <option value=@pm.Name>@pm.Name</option>
+            }
+        </select>
+    </div>
+</div>
+<div class="form-group-sm mt-4">
+    <label class="control-label" style="font-weight:bold">Response:</label>
+    <textarea rows="10" @bind="@Model!.Output1" class="form-control" style="background-color:#F5F5F5"></textarea>
+</div>
+
+<br />
+<img class="mt-2" src="@imageUri" width="512" height="512" />
+
+
+<p class="mt-4">
+    <label>
+        Upload an audio file (.mp3) to transcribe:
+        <InputFile OnChange="@LoadFile" />
+    </label>
+</p>
+
+<br />
+@if (isLoading)
+{
+    <p>Uploading...</p>
+}
+else
+{
+    <ul>
+        @foreach (var file in loadedFiles)
+        {
+            <li>
+                <ul>
+                    <li>Name: @file.Name</li>
+                    <li>Last modified: @file.LastModified.ToString()</li>
+                    <li>Size (bytes): @file.Size</li>
+                    <li>Content type: @file.ContentType</li>
+                </ul>
+            </li>
+        }
+    </ul>
+}
+
+
+
+@code
+{
+
+    private OpenAIClient client;
+
+    public ChatModel? Model { get; set; } = new();
+
+    private string outputText = null;
+
+    private Uri imageUri = null;
+
+    private List<IBrowserFile> loadedFiles = new();
+    private long maxFileSize = 1024 * 15;
+    private int maxAllowedFiles = 3;
+    private bool isLoading;
+
+    private List<PromptModel> promptModels = new();
+    private List<ImagePromptModel> imagePromptModels = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Model ??= new();
+
+        var apiKey = System.Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+
+        client = new OpenAIClient(apiKey);
+
+        await GenerateImage("a large, emoji smiley face on a dark blue background");
+
+        // Add some sample text prompts
+        promptModels.Add(PromptHelper.GetPromptAILanguageModelTutor());
+        promptModels.Add(PromptHelper.GetPromptCreateInterviewQuestions());
+        promptModels.Add(PromptHelper.GetPromptCreateStudyNotes());
+        promptModels.Add(PromptHelper.GetPromptCSharpXmlComments());
+        promptModels.Add(PromptHelper.GetPromptEssayOutline());
+        promptModels.Add(PromptHelper.GetPromptExplainCode());
+        promptModels.Add(PromptHelper.GetPromptExtractContactInformation());
+        promptModels.Add(PromptHelper.GetPromptExtractKeywords());
+        promptModels.Add(PromptHelper.GetPromptFactualAnswering());
+        promptModels.Add(PromptHelper.GetPromptFriendChat());
+        promptModels.Add(PromptHelper.GetPromptGrammarCorrection());
+        promptModels.Add(PromptHelper.GetPromptJavascriptHelperChatbot());
+        promptModels.Add(PromptHelper.GetPromptAdProductDescription());
+        promptModels.Add(PromptHelper.GetPromptTweetClassifier());
+        promptModels.Add(PromptHelper.GetPromptCalculateTimeComplexity());
+        promptModels.Add(PromptHelper.GetPromptHikingRecommendations());
+        promptModels.Add(PromptHelper.GetPromptClassification());
+        promptModels.Add(PromptHelper.GetPromptCSharpBugFixer());
+        promptModels.Add(PromptHelper.GetPromptCSharpToNaturalLanguage());
+        promptModels.Add(PromptHelper.GetPromptMoodToColor());
+        promptModels.Add(PromptHelper.GetPromptMovieToEmoji());
+        promptModels.Add(PromptHelper.GetPromptNaturalLanguageToOpenAI());
+        promptModels.Add(PromptHelper.GetPromptNotesToSummary());
+        promptModels.Add(PromptHelper.GetPromptOpenEndedChat());
+        promptModels.Add(PromptHelper.GetPromptQnA());
+        promptModels.Add(PromptHelper.GetPromptRecipeCreator());
+        promptModels.Add(PromptHelper.GetPromptRestaurantReviewCreator());
+        promptModels.Add(PromptHelper.GetPromptScienceFictionBookList());
+        promptModels.Add(PromptHelper.GetPromptSqlRequest());
+        promptModels.Add(PromptHelper.GetPromptSummarizeForSecondGrader());
+        promptModels.Add(PromptHelper.GetPromptTableCreator());
+        promptModels.Add(PromptHelper.GetPromptTextToCommand());
+        promptModels.Add(PromptHelper.GetPromptTurnByTurnDirections());
+        promptModels.Add(PromptHelper.GetPromptTweetClassifier());
+        promptModels.Add(PromptHelper.GetPromptBrainstormIdeaGenerator());
+
+        // Add some sample image prompts
+        List<ImagePromptModel> list;
+
+        list = ImagePromptHelper.GetImagePromptList();
+        foreach (var ip in list)
+        {
+            imagePromptModels.Add(ip);
+        }
+
+    }
+
+
+    private async Task OnSampleImagePromptSelected(ChangeEventArgs e)
+    {
+        string selectedName = e.Value.ToString();
+        Console.WriteLine("Selected: " + selectedName);
+        var selectedPrompt = imagePromptModels.Where(x => x.Name == selectedName).First();
+        Model.Prompt1 = selectedPrompt.Prompt;
+
+        await GenerateImage(selectedPrompt.Prompt);
+    }
+
+    private async Task OnSamplePromptSelected(ChangeEventArgs e)
+    {
+        string selectedName = e.Value.ToString();
+        Console.WriteLine("Selected: " + selectedName);
+        var selectedPrompt = promptModels.Where(x => x.Name == selectedName).First();
+        Model.Prompt1 = selectedPrompt.Prompt;
+
+        var completionOptions = selectedPrompt.Options;
+        completionOptions.Prompts.Add(selectedPrompt.Prompt);
+
+        await ProcessTextPrompt(completionOptions);
+    }
+
+
+    private async Task GenerateChatbotResponse()
+    {
+        var completionOptions = new CompletionsOptions
+        {
+            MaxTokens = 500,
+            Temperature = 0f,
+            FrequencyPenalty = 0.0f,
+            PresencePenalty = 0.0f
+        };
+
+        completionOptions.Prompts.Add(Model.Prompt1);
+
+        await ProcessTextPrompt(completionOptions);
+    }
+
+    private async Task ProcessTextPrompt(CompletionsOptions completionOptions)
+    {
+        Azure.Response<Completions> response = await client.GetCompletionsAsync(
+        "text-davinci-003", // assumes a matching model deployment or model name
+        completionOptions);
+
+        //completionOptions.Messages.Add(new ChatMessage(ChatRole.System, systemPrompt));
+        //completionOptions.Messages.Add(new ChatMessage(ChatRole.User, Model.Prompt1));
+        //ChatCompletions response = await client.GetChatCompletionsAsync("text-davinci-003", completionOptions);
+
+        Model.Output1 = "";
+        foreach (var choice in response.Value.Choices)
+        {
+            Console.WriteLine(choice.Text);
+            Model.Output1 += choice.Text;   // + "\n";
+        }
+    }
+
+    private async Task GenerateImage(string? prompt = null)
+    {
+
+        Azure.Response<ImageGenerations> imageGenerations = await client.GetImageGenerationsAsync(
+        new ImageGenerationOptions()
+        {
+            Prompt = prompt ?? Model.Prompt1, //"a happy monkey eating a banana, in watercolor",
+            ImageCount = 1,
+            Size = ImageSize.Size512x512,
+        });
+
+        // Image Generations responses provide URLs you can use to retrieve requested images
+        imageUri = imageGenerations.Value.Data[0].Url;
+    }
+
+    private async Task SummarizeText()
+    {
+        string textToSummarize = Model!.Prompt1;
+        textToSummarize = Regex.Replace(textToSummarize, @"[\u0000-\u001F]", string.Empty);
+
+        string summarizationPrompt = $@"
+            Summarize the following text.
+
+            Text:
+            """"""
+            {textToSummarize}
+            """"""
+
+            Summary:
+            ";
+
+        var completionsOptions = new CompletionsOptions()
+        {
+            Prompts = { summarizationPrompt },
+            MaxTokens = 500
+        };
+
+        string deploymentName = "text-davinci-003";
+
+        Azure.Response<Completions> completionResponse = client.GetCompletions(deploymentName, completionsOptions);
+        //string completion = completionsResponse.Value.Choices[0].Text;
+
+        Model.Output1 = "";
+        foreach (Choice choice in completionResponse.Value.Choices)
+        {
+            Console.WriteLine(choice.Text);
+            Model.Output1 += choice.Text + "\n";
+        }
+    }
+
+    private async Task TranscribeAudio()
+    {
+        using Stream audioStreamFromFile = File.OpenRead("myAudioFile.mp3");
+        BinaryData audioFileData = BinaryData.FromStream(audioStreamFromFile);
+
+        var transcriptionOptions = new AudioTranscriptionOptions()
+        {
+            AudioData = BinaryData.FromStream(audioStreamFromFile),
+            ResponseFormat = AudioTranscriptionFormat.Verbose,
+        };
+
+        Azure.Response<AudioTranscription> transcriptionResponse = await client.GetAudioTranscriptionAsync(
+            deploymentId: "my-whisper-deployment", // whisper-1 as model name for non-Azure OpenAI
+            transcriptionOptions);
+        AudioTranscription transcription = transcriptionResponse.Value;
+
+        // When using Simple, SRT, or VTT formats, only transcription.Text will be populated
+        Console.WriteLine($"Transcription ({transcription.Duration.Value.TotalSeconds}s):");
+        Console.WriteLine(transcription.Text);
+    }
+
+    private async Task TranslateAudioToEnglish()
+    {
+        using Stream audioStreamFromFile = File.OpenRead("mySpanishAudioFile.mp3");
+        BinaryData audioFileData = BinaryData.FromStream(audioStreamFromFile);
+
+        var translationOptions = new AudioTranslationOptions()
+        {
+            AudioData = BinaryData.FromStream(audioStreamFromFile),
+            ResponseFormat = AudioTranslationFormat.Verbose,
+        };
+
+        Azure.Response<AudioTranslation> translationResponse = await client.GetAudioTranslationAsync(
+            deploymentId: "my-whisper-deployment", // whisper-1 as model name for non-Azure OpenAI
+            translationOptions);
+        AudioTranslation translation = translationResponse.Value;
+
+        // When using Simple, SRT, or VTT formats, only translation.Text will be populated
+        Console.WriteLine($"Translation ({translation.Duration.Value.TotalSeconds}s):");
+        // .Text will be translated to English (ISO-639-1 "en")
+        Console.WriteLine(translation.Text);
+    }
+
+
+    private async Task LoadFile(InputFileChangeEventArgs e)
+    {
+        isLoading = true;
+        loadedFiles.Clear();
+
+        foreach (var file in e.GetMultipleFiles(maxAllowedFiles))
+        {
+            try
+            {
+                loadedFiles.Add(file);
+
+                var trustedFileNameForFileStorage = Path.GetRandomFileName();
+                var path = Path.Combine(Environment.ContentRootPath,
+                        Environment.EnvironmentName, "unsafe_uploads",
+                        trustedFileNameForFileStorage);
+
+                await using FileStream fs = new(path, FileMode.Create);
+                await file.OpenReadStream(maxFileSize).CopyToAsync(fs);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("File: {Filename} Error: {Error}",
+                    file.Name, ex.Message);
+            }
+        }
+
+        isLoading = false;
+    }
+
+
+    public class ChatModel
+    {
+        public string? Prompt1 { get; set; }
+        public string? Output1 { get; set; }
+
+    }
+
+
+}

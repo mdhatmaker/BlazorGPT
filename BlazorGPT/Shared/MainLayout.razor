@@ -1,0 +1,30 @@
+﻿@inherits LayoutComponentBase
+
+<PageTitle>BlazorGPT</PageTitle>
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        @*<div class="top-row px-4">
+            <a href="https://docs.microsoft.com/aspnet/" target="_blank">About</a>
+        </div>*@
+
+        <div class="row pb-2 pt-2" style="background-color:black">
+            <div class="col col-md-7"></div>
+            <div class="col col-md-5">
+                <a href="https://www.catalyte.io/" class="custom-logo-link" rel="home" aria-current="page" data-ol-has-click-handler="">
+                    <img width="400" height="47" src="https://www.catalyte.io/wp-content/uploads/2023/03/CATALYTE-2023-Logo-rev.png" class="custom-logo" alt="Catalyte" decoding="async" srcset="https://www.catalyte.io/wp-content/uploads/2023/03/CATALYTE-2023-Logo-rev.png 400w, https://www.catalyte.io/wp-content/uploads/2023/03/CATALYTE-2023-Logo-rev-300x35.png 300w, https://www.catalyte.io/wp-content/uploads/2023/03/CATALYTE-2023-Logo-rev-150x18.png 150w, https://www.catalyte.io/wp-content/uploads/2023/03/CATALYTE-2023-Logo-rev-170x20.png 170w" sizes="(max-width: 400px) 100vw, 400px">
+                </a>
+            </div>
+        </div>
+        
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
